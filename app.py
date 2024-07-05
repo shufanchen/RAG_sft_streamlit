@@ -45,20 +45,40 @@ if not os.path.exists(log_dir):
 else:
     print(f"Directory already exists: {log_dir}")
 
-# 初始化Git仓库（如果尚未初始化）
-if not os.path.exists('.git'):
-    subprocess.run(['git', 'init'], check=True)
-    subprocess.run(['git', 'remote', 'add', 'origin', GITHUB_REPO_URL], check=True)
+# 定义克隆仓库的目录名
+repo_dir = './SFT_log'
 
-# 添加./log文件夹到Git
-subprocess.run(['git', 'add', './log'], check=True)
+# 如果仓库目录不存在，则克隆仓库
+if not os.path.exists(repo_dir):
+    subprocess.run(['git', 'clone', GITHUB_REPO_URL, repo_dir], check=True)
+    print(f"Cloned repository to {repo_dir}")
+else:
+    print(f"Repository already exists at {repo_dir}")
 
-# 提交更改
-commit_message = "Add or update ./log folder"
-subprocess.run(['git', 'commit', '-m', commit_message], check=True)
+# 复制 ./log 文件夹到克隆的仓库目录
+subprocess.run(['cp', '-r', log_dir, repo_dir], check=True)
 
-# 推送更改到GitHub仓库
-subprocess.run(['git', 'push', '-u', 'origin', 'main'], check=True)
+# 切换到克隆的仓库目录
+os.chdir(repo_dir)
+
+# 添加 ./log 文件夹到 Git
+subprocess.run(['git', 'add', 'log'], check=True)
+
+# 检查是否有文件被添加
+result = subprocess.run(['git', 'status', '--porcelain'], capture_output=True, text=True)
+if result.stdout.strip():
+    try:
+        # 提交更改
+        commit_message = "Add or update ./log folder"
+        subprocess.run(['git', 'commit', '-m', commit_message], check=True)
+
+        # 推送更改到远程仓库
+        subprocess.run(['git', 'push', '-u', 'origin', 'main'], check=True)
+        print("Pushed ./log folder to GitHub repository.")
+    except subprocess.CalledProcessError as e:
+        print(f"An error occurred while running subprocess: {e}")
+else:
+    print("No changes to commit.")
 
 
 
