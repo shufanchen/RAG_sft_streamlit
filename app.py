@@ -5,8 +5,11 @@ import logging
 import torch
 import uuid
 from transformers import AutoModelForCausalLM, AutoTokenizer
-import subprocess
 import os
+import subprocess
+from datetime import datetime
+
+
 base_path = './RAG_models'
 
 # 检查目标目录是否存在，如果不存在则克隆仓库
@@ -45,42 +48,66 @@ if not os.path.exists(log_dir):
 else:
     print(f"Directory already exists: {log_dir}")
 
+# 如果log_dir是空的，则创建一个空的txt文件
+if not os.listdir(log_dir):
+    empty_file_path = os.path.join(log_dir, 'empty_log.txt')
+    with open(empty_file_path, 'w') as file:
+        pass  # 创建一个空的txt文件
+    print(f"Created empty file: {empty_file_path}")
+
+
 # 定义克隆仓库的目录名
 repo_dir = './SFT_log'
 
-# 如果仓库目录不存在，则克隆仓库
-if not os.path.exists(repo_dir):
-    subprocess.run(['git', 'clone', GITHUB_REPO_URL, repo_dir], check=True)
-    print(f"Cloned repository to {repo_dir}")
-else:
-    print(f"Repository already exists at {repo_dir}")
+# 如果仓库目录存在，则删除它
+if os.path.exists(repo_dir):
+    shutil.rmtree(repo_dir)
+    print(f"Deleted existing directory: {repo_dir}")
 
-# 复制 ./log 文件夹到克隆的仓库目录
-subprocess.run(['cp', '-r', log_dir, repo_dir], check=True)
+# 克隆远程仓库
+subprocess.run(['git', 'clone', GITHUB_REPO_URL, repo_dir], check=True)
+print(f"Cloned repository to {repo_dir}")
+
+# 复制当前日志文件到克隆的仓库目录，仅复制不重复的文件
+for item in os.listdir(log_dir):
+    s = os.path.join(log_dir, item)  # 源文件路径
+    d = os.path.join(repo_dir, item)  # 目标文件路径
+    if not os.path.exists(d):  # 检查目标路径中是否存在同名文件
+        shutil.copy2(s, d)  # 复制文件到目标路径
+        print(f"Copied {s} to {d}")
+    else:
+        print(f"Skipped {s}, already exists in {d}")
+
+
 
 # 切换到克隆的仓库目录
 os.chdir(repo_dir)
 
 # 添加 ./log 文件夹到 Git
-subprocess.run(['git', 'add', 'log'], check=True)
-
-# 检查是否有文件被添加
-result = subprocess.run(['git', 'status', '--porcelain'], capture_output=True, text=True)
-if result.stdout.strip():
-    try:
-        # 提交更改
-        commit_message = "Add or update ./log folder"
-        subprocess.run(['git', 'commit', '-m', commit_message], check=True)
-
-        # 推送更改到远程仓库
-        subprocess.run(['git', 'push', '-u', 'origin', 'main'], check=True)
-        print("Pushed ./log folder to GitHub repository.")
-    except subprocess.CalledProcessError as e:
-        print(f"An error occurred while running subprocess: {e}")
-else:
-    print("No changes to commit.")
+subprocess.run(['git', 'add', '-A'], check=True)
 
 
+try:
+     # 提交更改
+    commit_message = f"Add or update log files"
+    subprocess.run(['git', 'commit', '-m', commit_message], check=True)
+
+    # 推送更改到远程仓库
+    subprocess.run(['git', 'push', '-u', 'origin', 'main'], check=True)
+    print("Pushed log files to GitHub repository.")
+except Exception as e:
+    print(f"An error occurred while running subprocess: {e}")
+
+
+
+
+# 确定本次启动的日志文件名称
+timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+log_file = f"st_log_{timestamp}.log"
+log_file_path = os.path.join(log_dir, log_file)
+# 创建本次启动的日志文件
+with open(log_file_path, 'w') as file:
+    pass  # 这将创建一个空文件
 
 
 
@@ -91,7 +118,7 @@ def setup_logger():
         formatter = logging.Formatter(log_format)
 
         # 创建一个文件处理器，并赋予一个唯一的名称
-        file_handler = logging.FileHandler('./log/st_log.log')
+        file_handler = logging.FileHandler(log_file_path)
         file_handler.setLevel(logging.INFO)
         file_handler.setFormatter(formatter)
         file_handler_name = 'streamlit_file_handler'
@@ -131,7 +158,7 @@ else:
 def chat(message, history):
     streamlit_root_logger.info(f"User ({user_id}) query: {message}")
     for response, history in model.stream_chat(tokenizer, message, history, top_p=0.7, temperature=1):
-        streamlit_root_logger.info(f"Response to {user_id}: {response}")
+        #streamlit_root_logger.info(f"Response to {user_id}: {response}")
         yield response
 
 # def send_query(query):
@@ -161,7 +188,7 @@ if st.button("开始回答"):
     if user_input:
         # Display user's query
         st.write(f"User ({user_id}): {user_input}")
-        streamlit_root_logger.info(f"User ({user_id}) query (Extract keywords): {user_input}")
+        streamlit_root_logger.info(f"User ({user_id}) query : {user_input}")
 
         # Get and display the response from the chat server
         try:
@@ -173,27 +200,43 @@ if st.button("开始回答"):
             st.write(f"Bot: {result}")
             st.session_state['result'] = result
             st.session_state['feedback_given'] = False
-            streamlit_root_logger.info(f"Response (Extract keywords): {result}")
+            streamlit_root_logger.info(f"Response to {user_id}: {result}")
         except Exception as e:
             st.error(f"An error occurred: {e}")
-            streamlit_root_logger.error(f"Error (Extract keywords): {e}")
+            streamlit_root_logger.error(f"Error of {user_id}: {e}")
     else:
         st.error("Please enter a query to send.")
 
 # 加入用户评价功能
 if st.session_state['result'] is not None and not st.session_state['feedback_given']:
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
         if st.button("满意"):
             streamlit_root_logger.info(f"User satisfaction (满意) for user ({user_id})")
             st.session_state['feedback_given'] = True
-            st.rerun()
+            st.experimental_rerun()
     with col2:
         if st.button("不满意"):
             streamlit_root_logger.info(f"User satisfaction (不满意) for user ({user_id})")
             st.session_state['feedback_given'] = True
-            st.rerun()
+            st.experimental_rerun()
+    with col3:
+        if st.button("建议"):
+            st.session_state['give_suggestion'] = True
+
+if st.session_state.get('give_suggestion', False):
+    suggestion = st.text_area("请输入您的建议：")
+    if st.button("提交建议"):
+        if suggestion:
+            streamlit_root_logger.info(f"User suggestion for user ({user_id}): {suggestion}")
+            st.write("Thank you for your feedback!")
+            st.session_state['result'] = None
+            st.session_state['give_suggestion'] = False
+            st.session_state['feedback_given'] = True
+        else:
+            st.error("建议不能为空，请输入您的建议。")
 
 if st.session_state['feedback_given']:
     st.write("Thank you for your feedback!")
     st.session_state['result'] = None
+
