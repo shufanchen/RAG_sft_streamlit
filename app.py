@@ -5,7 +5,7 @@ import logging
 import torch
 import uuid
 from transformers import AutoModelForCausalLM, AutoTokenizer
-
+import subprocess
 
 base_path = './RAG_models'
 
