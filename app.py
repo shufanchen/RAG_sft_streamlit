@@ -6,7 +6,7 @@ import torch
 import uuid
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import subprocess
-
+import os
 base_path = './RAG_models'
 
 # 检查目标目录是否存在，如果不存在则克隆仓库
