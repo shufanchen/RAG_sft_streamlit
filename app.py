@@ -238,5 +238,5 @@ if st.session_state.get('give_suggestion', False):
 
 if st.session_state['feedback_given']:
     st.write("Thank you for your feedback!")
-    st.session_state['result'] = None
+    st.write(f"Bot: {st.session_state['result']}")
 
