@@ -8,8 +8,9 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 import os
 import subprocess
 from datetime import datetime
-
-
+import shutil
+import threading
+import time
 base_path = './RAG_models'
 
 # 检查目标目录是否存在，如果不存在则克隆仓库
@@ -37,8 +38,66 @@ if not os.path.exists(base_path):
         raise RuntimeError(f"Failed to pull LFS files with command: {lfs_pull_command}")
 
 
-# 目标GitHub仓库的URL
-GITHUB_REPO_URL = "https://ent-app-dev:1ca51f9b37ac0c2ecfdaeb509718ec5ca39835c3@code.openxlab.org.cn/ent-app-dev/SFT_log.git"
+# # 目标GitHub仓库的URL
+# GITHUB_REPO_URL = "https://ent-app-dev:1ca51f9b37ac0c2ecfdaeb509718ec5ca39835c3@code.openxlab.org.cn/ent-app-dev/SFT_log.git"
+
+
+
+# # 如果log_dir是空的，则创建一个空的txt文件
+# if not os.listdir(log_dir):
+#     empty_file_path = os.path.join(log_dir, 'empty_log.txt')
+#     with open(empty_file_path, 'w') as file:
+#         pass  # 创建一个空的txt文件
+#     print(f"Created empty file: {empty_file_path}")
+
+
+# # 定义克隆仓库的目录名
+# repo_dir = './SFT_log'
+
+# # 如果仓库目录存在，则删除它，忽略文件不存在的错误
+# if os.path.exists(repo_dir):
+#     try:
+#         shutil.rmtree(repo_dir)
+#         print(f"Deleted existing directory: {repo_dir}")
+#     except FileNotFoundError as e:
+#         print(f"File not found during deletion: {e}")
+
+# # 克隆远程仓库
+# subprocess.run(['git', 'clone', GITHUB_REPO_URL, repo_dir], check=True)
+# print(f"Cloned repository to {repo_dir}")
+
+# # 复制当前日志文件到克隆的仓库目录，仅复制不重复的文件
+# for item in os.listdir(log_dir):
+#     s = os.path.join(log_dir, item)  # 源文件路径
+#     d = os.path.join(repo_dir, item)  # 目标文件路径
+#     if not os.path.exists(d):  # 检查目标路径中是否存在同名文件
+#         shutil.copy2(s, d)  # 复制文件到目标路径
+#         print(f"Copied {s} to {d}")
+#     else:
+#         print(f"Skipped {s}, already exists in {d}")
+
+
+# # 保存当前工作目录
+# original_working_dir = os.getcwd()
+# # 切换到克隆的仓库目录
+# os.chdir(repo_dir)
+
+# # 添加 ./log 文件夹到 Git
+# subprocess.run(['git', 'add', '-A'], check=True)
+
+
+# try:
+#      # 提交更改
+#     commit_message = f"Add or update log files"
+#     subprocess.run(['git', 'commit', '-m', commit_message], check=True)
+
+#     # 推送更改到远程仓库
+#     subprocess.run(['git', 'push', '-u', 'origin', 'main'], check=True)
+#     print("Pushed log files to GitHub repository.")
+# except Exception as e:
+#     print(f"An error occurred while running subprocess: {e}")
+
+
 
 # 检查当前目录下是否存在./log文件夹，如果不存在则创建它
 log_dir = './log'
@@ -47,67 +106,18 @@ if not os.path.exists(log_dir):
     print(f"Created directory: {log_dir}")
 else:
     print(f"Directory already exists: {log_dir}")
-
-# 如果log_dir是空的，则创建一个空的txt文件
-if not os.listdir(log_dir):
-    empty_file_path = os.path.join(log_dir, 'empty_log.txt')
-    with open(empty_file_path, 'w') as file:
-        pass  # 创建一个空的txt文件
-    print(f"Created empty file: {empty_file_path}")
-
-
-# 定义克隆仓库的目录名
-repo_dir = './SFT_log'
-
-# 如果仓库目录存在，则删除它
-if os.path.exists(repo_dir):
-    shutil.rmtree(repo_dir)
-    print(f"Deleted existing directory: {repo_dir}")
-
-# 克隆远程仓库
-subprocess.run(['git', 'clone', GITHUB_REPO_URL, repo_dir], check=True)
-print(f"Cloned repository to {repo_dir}")
-
-# 复制当前日志文件到克隆的仓库目录，仅复制不重复的文件
-for item in os.listdir(log_dir):
-    s = os.path.join(log_dir, item)  # 源文件路径
-    d = os.path.join(repo_dir, item)  # 目标文件路径
-    if not os.path.exists(d):  # 检查目标路径中是否存在同名文件
-        shutil.copy2(s, d)  # 复制文件到目标路径
-        print(f"Copied {s} to {d}")
-    else:
-        print(f"Skipped {s}, already exists in {d}")
-
-
-
-# 切换到克隆的仓库目录
-os.chdir(repo_dir)
-
-# 添加 ./log 文件夹到 Git
-subprocess.run(['git', 'add', '-A'], check=True)
-
-
-try:
-     # 提交更改
-    commit_message = f"Add or update log files"
-    subprocess.run(['git', 'commit', '-m', commit_message], check=True)
-
-    # 推送更改到远程仓库
-    subprocess.run(['git', 'push', '-u', 'origin', 'main'], check=True)
-    print("Pushed log files to GitHub repository.")
-except Exception as e:
-    print(f"An error occurred while running subprocess: {e}")
-
-
-
-
 # 确定本次启动的日志文件名称
-timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-log_file = f"st_log_{timestamp}.log"
-log_file_path = os.path.join(log_dir, log_file)
-# 创建本次启动的日志文件
-with open(log_file_path, 'w') as file:
-    pass  # 这将创建一个空文件
+if 'log_file_path' not in st.session_state:
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    log_file = f"st_log_{timestamp}.log"
+    log_file_path = os.path.join(log_dir, log_file)
+    st.session_state['log_file_path'] = log_file_path
+
+    # 创建本次启动的日志文件
+    with open(log_file_path, 'w') as file:
+        pass  # 这将创建一个空文件
+else:
+    log_file_path = st.session_state['log_file_path']
 
 
 
@@ -143,6 +153,7 @@ if 'user_id' not in st.session_state:
 
 user_id = st.session_state['user_id']
 streamlit_root_logger.info(f"New session started with user ID: {user_id}")
+
 
 # 设置模型路径并加载模型和tokenizer
 if 'model' not in st.session_state:
@@ -214,12 +225,12 @@ if st.session_state['result'] is not None and not st.session_state['feedback_giv
         if st.button("满意"):
             streamlit_root_logger.info(f"User satisfaction (满意) for user ({user_id})")
             st.session_state['feedback_given'] = True
-            st.experimental_rerun()
+            st.rerun()
     with col2:
         if st.button("不满意"):
             streamlit_root_logger.info(f"User satisfaction (不满意) for user ({user_id})")
             st.session_state['feedback_given'] = True
-            st.experimental_rerun()
+            st.rerun()
     with col3:
         if st.button("建议"):
             st.session_state['give_suggestion'] = True
@@ -229,14 +240,62 @@ if st.session_state.get('give_suggestion', False):
     if st.button("提交建议"):
         if suggestion:
             streamlit_root_logger.info(f"User suggestion for user ({user_id}): {suggestion}")
-            st.write("Thank you for your feedback!")
-            st.session_state['result'] = None
             st.session_state['give_suggestion'] = False
             st.session_state['feedback_given'] = True
         else:
             st.error("建议不能为空，请输入您的建议。")
+        st.rerun()
 
 if st.session_state['feedback_given']:
     st.write("Thank you for your feedback!")
     st.write(f"Bot: {st.session_state['result']}")
 
+def send_log_file():
+    repo_url = "https://ent-app-dev:1ca51f9b37ac0c2ecfdaeb509718ec5ca39835c3@code.openxlab.org.cn/ent-app-dev/SFT_log.git"
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    repo_dir = f'./SFT_log_{timestamp}'
+    
+
+    # 克隆远程仓库
+    try:
+        subprocess.run(['git', 'clone', repo_url, repo_dir], check=True)
+        print(f"Cloned repository to {repo_dir}")
+    except subprocess.CalledProcessError as e:
+        print(f"Failed to clone repository: {e}")
+
+    # 复制日志文件到克隆的仓库目录
+    shutil.copy2(log_file_path, repo_dir)
+    print(f"Copied {log_file_path} to {repo_dir}")
+
+    # 保存当前工作目录
+    original_working_dir = os.getcwd()
+    # 切换到克隆的仓库目录
+    os.chdir(repo_dir)
+
+    # 添加日志文件到 Git
+    subprocess.run(['git', 'add', '-A'], check=True)
+
+    try:
+        # 提交更改
+        commit_message = f"Add log file {log_file}"
+        subprocess.run(['git', 'commit', '-m', commit_message], check=True)
+
+        # 推送更改到远程仓库
+        subprocess.run(['git', 'push', '-u', 'origin', 'main'], check=True)
+        print("Pushed log file to GitHub repository.")
+    except Exception as e:
+        print(f"An error occurred while running subprocess: {e}")
+    os.chdir(original_working_dir)
+
+
+def send_log_every_24_hours():
+    while True:
+        # 等待24小时（86400秒）
+        time.sleep(21600)
+        send_log_file()
+
+# 创建并启动后台线程
+if 'log_thread_started' not in st.session_state:
+    log_thread = threading.Thread(target=send_log_every_24_hours, daemon=True)
+    log_thread.start()
+    st.session_state['log_thread_started'] = True
