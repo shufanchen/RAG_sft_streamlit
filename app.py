@@ -203,14 +203,6 @@ def send_log_file():
     repo_url = "https://ent-app-dev:1ca51f9b37ac0c2ecfdaeb509718ec5ca39835c3@code.openxlab.org.cn/ent-app-dev/SFT_log.git"
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
     repo_dir = f'./SFT_log_{timestamp}'
-    
-    # 设置 Git 用户名和邮箱
-    try:
-        subprocess.run(['git', 'config', 'user.name', 'RAG_sft_test'], check=True)
-        subprocess.run(['git', 'config', 'user.email', 'RAG_sft_test@pjlab.org.cn'], check=True)
-        print("Configured Git user name and email.")
-    except subprocess.CalledProcessError as e:
-        print(f"Failed to configure Git user name and email: {e}")
         
     # 克隆远程仓库
     try:
@@ -227,6 +219,13 @@ def send_log_file():
     original_working_dir = os.getcwd()
     # 切换到克隆的仓库目录
     os.chdir(repo_dir)
+    # 设置 Git 用户名和邮箱
+    try:
+        subprocess.run(['git', 'config', 'user.name', 'RAG_sft_test'], check=True)
+        subprocess.run(['git', 'config', 'user.email', 'RAG_sft_test@pjlab.org.cn'], check=True)
+        print("Configured Git user name and email.")
+    except subprocess.CalledProcessError as e:
+        print(f"Failed to configure Git user name and email: {e}")
 
     # 添加日志文件到 Git
     subprocess.run(['git', 'add', '-A'], check=True)
