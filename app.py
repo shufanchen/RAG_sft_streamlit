@@ -11,6 +11,14 @@ from datetime import datetime
 import shutil
 import threading
 import time
+# 设置 PyTorch 的 CUDA 内存分配策略
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:128"
+# 清空未使用的显存
+torch.cuda.empty_cache()
+
+# 打印当前显存使用情况
+print(torch.cuda.memory_summary(device=None, abbreviated=False))
+#模型地址
 base_path = './RAG_models'
 
 # 检查目标目录是否存在，如果不存在则克隆仓库
