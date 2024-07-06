@@ -20,7 +20,8 @@ torch.cuda.empty_cache()
 print(torch.cuda.memory_summary(device=None, abbreviated=False))
 #模型地址
 base_path = './RAG_models'
-
+#每次使用时间限制
+use_time_limit = 300
 # 检查目标目录是否存在，如果不存在则克隆仓库
 if not os.path.exists(base_path):
     clone_command = f'git clone https://ent-app-dev:1ca51f9b37ac0c2ecfdaeb509718ec5ca39835c3@code.openxlab.org.cn/ent-app-dev/RAG_models.git {base_path}'
@@ -45,65 +46,6 @@ if not os.path.exists(base_path):
         print(f"LFS pull error output: {e.stderr.decode()}")
         raise RuntimeError(f"Failed to pull LFS files with command: {lfs_pull_command}")
 
-
-# # 目标GitHub仓库的URL
-# GITHUB_REPO_URL = "https://ent-app-dev:1ca51f9b37ac0c2ecfdaeb509718ec5ca39835c3@code.openxlab.org.cn/ent-app-dev/SFT_log.git"
-
-
-
-# # 如果log_dir是空的，则创建一个空的txt文件
-# if not os.listdir(log_dir):
-#     empty_file_path = os.path.join(log_dir, 'empty_log.txt')
-#     with open(empty_file_path, 'w') as file:
-#         pass  # 创建一个空的txt文件
-#     print(f"Created empty file: {empty_file_path}")
-
-
-# # 定义克隆仓库的目录名
-# repo_dir = './SFT_log'
-
-# # 如果仓库目录存在，则删除它，忽略文件不存在的错误
-# if os.path.exists(repo_dir):
-#     try:
-#         shutil.rmtree(repo_dir)
-#         print(f"Deleted existing directory: {repo_dir}")
-#     except FileNotFoundError as e:
-#         print(f"File not found during deletion: {e}")
-
-# # 克隆远程仓库
-# subprocess.run(['git', 'clone', GITHUB_REPO_URL, repo_dir], check=True)
-# print(f"Cloned repository to {repo_dir}")
-
-# # 复制当前日志文件到克隆的仓库目录，仅复制不重复的文件
-# for item in os.listdir(log_dir):
-#     s = os.path.join(log_dir, item)  # 源文件路径
-#     d = os.path.join(repo_dir, item)  # 目标文件路径
-#     if not os.path.exists(d):  # 检查目标路径中是否存在同名文件
-#         shutil.copy2(s, d)  # 复制文件到目标路径
-#         print(f"Copied {s} to {d}")
-#     else:
-#         print(f"Skipped {s}, already exists in {d}")
-
-
-# # 保存当前工作目录
-# original_working_dir = os.getcwd()
-# # 切换到克隆的仓库目录
-# os.chdir(repo_dir)
-
-# # 添加 ./log 文件夹到 Git
-# subprocess.run(['git', 'add', '-A'], check=True)
-
-
-# try:
-#      # 提交更改
-#     commit_message = f"Add or update log files"
-#     subprocess.run(['git', 'commit', '-m', commit_message], check=True)
-
-#     # 推送更改到远程仓库
-#     subprocess.run(['git', 'push', '-u', 'origin', 'main'], check=True)
-#     print("Pushed log files to GitHub repository.")
-# except Exception as e:
-#     print(f"An error occurred while running subprocess: {e}")
 
 
 
@@ -164,15 +106,28 @@ streamlit_root_logger.info(f"New session started with user ID: {user_id}")
 
 
 # 设置模型路径并加载模型和tokenizer
-if 'model' not in st.session_state:
-    base_path = './RAG_models'
-    tokenizer = AutoTokenizer.from_pretrained(base_path + '/Sft_model', trust_remote_code=True)
-    model = AutoModelForCausalLM.from_pretrained(base_path + '/Sft_model', trust_remote_code=True, torch_dtype=torch.float16).cuda()
-    st.session_state['model'] = model
-    st.session_state['tokenizer'] = tokenizer
-else:
-    model = st.session_state['model']
-    tokenizer = st.session_state['tokenizer']
+while 'model' not in st.session_state:
+    try:
+        base_path = './RAG_models'
+        tokenizer = AutoTokenizer.from_pretrained(base_path + '/Sft_model', trust_remote_code=True)
+        model = AutoModelForCausalLM.from_pretrained(base_path + '/Sft_model', trust_remote_code=True, torch_dtype=torch.float16).cuda()
+        st.session_state['model'] = model
+        st.session_state['tokenizer'] = tokenizer
+    except RuntimeError as e:
+        if 'out of memory' in str(e):
+            print("显存不足，请稍后再试...")
+            torch.cuda.empty_cache()  # 清空未使用的显存
+        else:
+            raise e  # 如果不是显存不足的问题，重新抛出异常
+    finally:
+        if 'model' not in st.session_state:
+            time.sleep(use_time_limit)  # 等待5分钟（300秒）再尝试加载模型
+
+# 加载成功后，使用模型和tokenizer
+model = st.session_state['model']
+tokenizer = st.session_state['tokenizer']
+
+
 
 def chat(message, history):
     streamlit_root_logger.info(f"User ({user_id}) query: {message}")
@@ -180,18 +135,6 @@ def chat(message, history):
         #streamlit_root_logger.info(f"Response to {user_id}: {response}")
         yield response
 
-# def send_query(query):
-#     query = f'<|im_start|>user\n{query}<|im_end|>\n<|im_start|>assistant\n'
-#     input_ids = tokenizer.encode(query, return_tensors="pt").to("cuda")
-#     output_ids = model.generate(
-#         input_ids,
-#         max_length=1024,  # 设置生成文本的最大长度
-#         temperature=1,
-#         top_k=50,
-#         top_p=1.0,
-#     )
-#     output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
-#     return output_text
 
 # 创建 Streamlit UI 组件
 st.title("商飞大模型测试")
@@ -296,14 +239,19 @@ def send_log_file():
     os.chdir(original_working_dir)
 
 
-def send_log_every_24_hours():
-    while True:
-        # 等待24小时（86400秒）
-        time.sleep(21600)
-        send_log_file()
+def send_log_every_time():
+     # 释放模型和显存
+    time.sleep(use_time_limit)  
+    if 'model' in st.session_state:
+        del st.session_state['model']
+    if 'tokenizer' in st.session_state:
+        del st.session_state['tokenizer']
+    torch.cuda.empty_cache()     
+    send_log_file()
+
 
 # 创建并启动后台线程
 if 'log_thread_started' not in st.session_state:
-    log_thread = threading.Thread(target=send_log_every_24_hours, daemon=True)
+    log_thread = threading.Thread(target=send_log_every_time, daemon=True)
     log_thread.start()
     st.session_state['log_thread_started'] = True
