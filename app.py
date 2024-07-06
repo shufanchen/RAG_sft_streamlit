@@ -204,7 +204,14 @@ def send_log_file():
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
     repo_dir = f'./SFT_log_{timestamp}'
     
-
+    # 设置 Git 用户名和邮箱
+    try:
+        subprocess.run(['git', 'config', 'user.name', 'RAG_sft_test'], check=True)
+        subprocess.run(['git', 'config', 'user.email', 'RAG_sft_test@pjlab.org.cn'], check=True)
+        print("Configured Git user name and email.")
+    except subprocess.CalledProcessError as e:
+        print(f"Failed to configure Git user name and email: {e}")
+        
     # 克隆远程仓库
     try:
         subprocess.run(['git', 'clone', repo_url, repo_dir], check=True)
