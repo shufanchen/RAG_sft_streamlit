@@ -115,13 +115,11 @@ while 'model' not in st.session_state:
         st.session_state['tokenizer'] = tokenizer
     except RuntimeError as e:
         if 'out of memory' in str(e):
-            print("显存不足，请稍后再试...")
+            st.error("目前使用人数较多，显存不足，请稍后再试")
             torch.cuda.empty_cache()  # 清空未使用的显存
-        else:
-            raise e  # 如果不是显存不足的问题，重新抛出异常
-    finally:
-        if 'model' not in st.session_state:
-            time.sleep(use_time_limit)  # 等待5分钟（300秒）再尝试加载模型
+            time.sleep(use_time_limit)
+        raise e  #抛出异常
+
 
 # 加载成功后，使用模型和tokenizer
 model = st.session_state['model']
@@ -138,7 +136,7 @@ def chat(message, history):
 
 # 创建 Streamlit UI 组件
 st.title("商飞大模型测试")
-user_input = st.text_input("请输入你的关于飞机设计相关问题", placeholder="请在这里输入（中英文均支持）...")
+user_input = st.text_input("请输入你的关于飞机设计相关问题(注意目前单次会话最长时间为5分钟)", placeholder="请在这里输入（中英文均支持）...")
 
 if 'result' not in st.session_state:
     st.session_state['result'] = None
